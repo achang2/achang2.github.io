@@ -2,9 +2,12 @@
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import Icon from '../../components/Icon.astro';
 import TagList from '../../components/TagList.astro';
-import { formatDate, getUpdates, isoDate } from '../../lib/updates';
+import { formatDate, getTagCounts, getUpdates, isoDate, searchText } from '../../lib/updates';
 
 const updates = await getUpdates();
+const tagCounts = getTagCounts(updates);
+const total = updates.length;
+const allLabel = `Showing all ${total} ${total === 1 ? 'update' : 'updates'}.`;
 ---
 
 <BaseLayout
@@ -18,12 +21,77 @@ const updates = await getUpdates();
   </p>
 
   {
-    updates.length === 0 ? (
+    total > 0 && (
+      <>
+        <noscript>
+          <p class="muted">Search and tag filtering need JavaScript. All updates are listed below.</p>
+        </noscript>
+
+        <form class="filters js-only" role="search" aria-label="Weekly updates" id="update-filters">
+          <div class="search-field">
+            <label for="update-search">Search updates</label>
+            <div class="search-input">
+              <Icon name="search" />
+              <input
+                type="search"
+                id="update-search"
+                name="q"
+                autocomplete="off"
+                spellcheck="false"
+                aria-describedby="update-search-hint"
+              />
+            </div>
+            <p id="update-search-hint" class="hint">
+              Finds posts containing the exact phrase, in the title or anywhere in the post.
+            </p>
+          </div>
+
+          {tagCounts.length > 0 && (
+            <fieldset class="tag-filter">
+              <legend>
+                Filter by tag <span class="hint">(shows posts with any selected tag)</span>
+              </legend>
+              <ul class="pill-list">
+                {tagCounts.map(({ tag, count }) => (
+                  <li>
+                    <label class="tag-option">
+                      <input type="checkbox" name="tag" value={tag} />
+                      <Icon name="tag" />
+                      <span>
+                        {tag} <span class="muted">({count})</span>
+                      </span>
+                    </label>
+                  </li>
+                ))}
+              </ul>
+            </fieldset>
+          )}
+
+          <button type="reset" class="clear-button">
+            <Icon name="x" />
+            Clear search and filters
+          </button>
+        </form>
+
+        {/* Announced to screen readers when the results change; also visible to everyone. */}
+        <p class="results-status js-only" id="results-status" role="status" aria-live="polite">
+          {allLabel}
+        </p>
+      </>
+    )
+  }
+
+  {
+    total === 0 ? (
       <p>No updates yet.</p>
     ) : (
-      <ol class="card-list">
+      <ol class="card-list" id="update-list" aria-label="Weekly updates, newest first">
         {updates.map((update) => (
-          <li class="card">
+          <li
+            class="card"
+            data-tags={JSON.stringify(update.data.tags)}
+            data-search={searchText(update)}
+          >
             <h2>
               <a href={`/updates/${update.id}/`}>{update.data.title}</a>
             </h2>
@@ -40,4 +108,218 @@ const updates = await getUpdates();
       </ol>
     )
   }
+
+  <p class="no-results" id="no-results" hidden>
+    No updates match. Try a different phrase or clear the filters.
+  </p>
 </BaseLayout>
+
+<script>
+  const form = document.querySelector<HTMLFormElement>('#update-filters');
+  const list = document.querySelector<HTMLOListElement>('#update-list');
+
+  if (form && list) {
+    const searchInput = form.querySelector<HTMLInputElement>('#update-search')!;
+    const tagBoxes = [...form.querySelectorAll<HTMLInputElement>('input[name="tag"]')];
+    const status = document.querySelector<HTMLParagraphElement>('#results-status')!;
+    const noResults = document.querySelector<HTMLParagraphElement>('#no-results')!;
+    const posts = [...list.querySelectorAll<HTMLLIElement>(':scope > li')];
+    const total = posts.length;
+
+    const normalize = (text: string) => text.toLowerCase().replace(/\s+/g, ' ').trim();
+    const plural = (n: number) => (n === 1 ? 'update' : 'updates');
+
+    // Debounce the live-region text so screen readers aren't interrupted on every keystroke.
+    let announceTimer: number | undefined;
+    const announce = (message: string) => {
+      window.clearTimeout(announceTimer);
+      announceTimer = window.setTimeout(() => {
+        status.textContent = message;
+      }, 400);
+    };
+
+    const describe = (shown: number, phrase: string, tags: string[]) => {
+      if (!phrase && tags.length === 0) return `Showing all ${total} ${plural(total)}.`;
+      const parts: string[] = [];
+      if (phrase) parts.push(`containing “${phrase}”`);
+      if (tags.length) parts.push(`tagged ${tags.join(' or ')}`);
+      return `Showing ${shown} of ${total} ${plural(total)} ${parts.join(' and ')}.`;
+    };
+
+    const apply = () => {
+      const phrase = normalize(searchInput.value);
+      const tags = tagBoxes.filter((box) => box.checked).map((box) => box.value);
+
+      let shown = 0;
+      for (const post of posts) {
+        const postTags: string[] = JSON.parse(post.dataset.tags ?? '[]');
+        const matchesPhrase = !phrase || (post.dataset.search ?? '').includes(phrase);
+        const matchesTags = tags.length === 0 || tags.some((tag) => postTags.includes(tag));
+        const visible = matchesPhrase && matchesTags;
+        post.hidden = !visible;
+        if (visible) shown++;
+      }
+
+      noResults.hidden = shown > 0;
+      announce(describe(shown, phrase, tags));
+
+      // Keep the URL in sync so a filtered view can be bookmarked or shared.
+      const params = new URLSearchParams();
+      if (searchInput.value.trim()) params.set('q', searchInput.value.trim());
+      for (const tag of tags) params.append('tag', tag);
+      const query = params.toString();
+      history.replaceState(null, '', query ? `?${query}` : location.pathname);
+    };
+
+    // Restore state from the URL, e.g. when arriving from a tag link on a post.
+    const initial = new URLSearchParams(location.search);
+    searchInput.value = initial.get('q') ?? '';
+    const initialTags = initial.getAll('tag').map((tag) => tag.toLowerCase());
+    for (const box of tagBoxes) box.checked = initialTags.includes(box.value);
+
+    form.addEventListener('input', apply);
+    form.addEventListener('submit', (event) => {
+      event.preventDefault();
+      apply();
+    });
+    form.addEventListener('reset', () => {
+      // The reset event fires before the fields are cleared.
+      window.setTimeout(() => {
+        apply();
+        searchInput.focus();
+      });
+    });
+
+    apply();
+  }
+</script>
+
+<style>
+  /* Search and filter controls only work with JavaScript, so hide them without it. */
+  :global(html:not(.js)) .js-only {
+    display: none;
+  }
+
+  .filters {
+    display: grid;
+    gap: 1.25rem;
+    margin: 1.5rem 0 1rem;
+    padding: 1.25rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--bg-subtle);
+  }
+
+  .search-field label,
+  .tag-filter legend {
+    display: block;
+    font-weight: 700;
+    margin-bottom: 0.35rem;
+  }
+
+  .search-input {
+    position: relative;
+    display: flex;
+    align-items: center;
+  }
+
+  .search-input .icon {
+    position: absolute;
+    left: 0.75rem;
+    color: var(--text-muted);
+    pointer-events: none;
+  }
+
+  .search-input input {
+    width: 100%;
+    min-height: 2.75rem;
+    padding: 0.5rem 0.75rem 0.5rem 2.5rem;
+    font: inherit;
+    color: var(--text);
+    background: var(--bg);
+    border: 2px solid var(--text-muted);
+    border-radius: var(--radius);
+  }
+
+  .hint {
+    margin: 0.35rem 0 0;
+    font-size: 0.9rem;
+    font-weight: 400;
+    color: var(--text-muted);
+  }
+
+  .tag-filter {
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+
+  .tag-filter legend .hint {
+    display: inline;
+  }
+
+  /* Native checkboxes stay visible, so the checked state is shown by the checkmark, not color. */
+  .tag-option {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4em;
+    min-height: 2.75rem;
+    padding: 0 0.85rem;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: var(--bg);
+    cursor: pointer;
+  }
+
+  .tag-option input {
+    width: 1.1rem;
+    height: 1.1rem;
+    margin: 0;
+    accent-color: var(--accent);
+  }
+
+  /* Checked tags also get a thicker border and bold text. */
+  .tag-option:has(input:checked) {
+    border: 2px solid var(--accent);
+    font-weight: 700;
+  }
+
+  .tag-option:has(input:focus-visible) {
+    outline: 3px solid var(--focus);
+    outline-offset: 2px;
+  }
+
+  .tag-option input:focus-visible {
+    outline: none;
+  }
+
+  .clear-button {
+    justify-self: start;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4em;
+    min-height: 2.75rem;
+    padding: 0 1rem;
+    font: inherit;
+    color: var(--text);
+    background: var(--bg);
+    border: 2px solid var(--text-muted);
+    border-radius: var(--radius);
+    cursor: pointer;
+  }
+
+  .clear-button:hover {
+    border-color: var(--text);
+  }
+
+  .results-status {
+    font-weight: 600;
+    margin: 0 0 0.5rem;
+  }
+
+  .no-results {
+    padding: 1rem 1.25rem;
+    border: 2px dashed var(--border);
+    border-radius: var(--radius);
+  }
+</style>
