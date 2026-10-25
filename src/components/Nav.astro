@@ -1,0 +1,84 @@
+---
+import Icon, { type IconName } from './Icon.astro';
+
+interface NavItem {
+  href: string;
+  label: string;
+  icon: IconName;
+}
+
+const items: NavItem[] = [
+  { href: '/', label: 'About', icon: 'user' },
+  { href: '/projects/', label: 'Projects', icon: 'folder' },
+  { href: '/updates/', label: 'Weekly Updates', icon: 'calendar-check' },
+];
+
+const path = Astro.url.pathname;
+const isCurrent = (href: string) => path === href;
+// "In section" lets /projects/foo/ highlight the Projects item without claiming to be that page.
+const inSection = (href: string) => (href === '/' ? path === '/' : path.startsWith(href));
+---
+
+<nav class="site-nav" aria-label="Main">
+  <ul class="nav-list">
+    {
+      items.map((item) => (
+        <li class="nav-item">
+          <a
+            class:list={['nav-link', { 'in-section': inSection(item.href) }]}
+            href={item.href}
+            aria-current={isCurrent(item.href) ? 'page' : undefined}
+          >
+            <Icon name={item.icon} />
+            {item.label}
+          </a>
+        </li>
+      ))
+    }
+  </ul>
+</nav>
+
+<style>
+  .nav-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem 0.5rem;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .nav-item {
+    position: relative;
+    display: flex;
+    align-items: center;
+  }
+
+  .nav-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4em;
+    /* Generous hit area: at least 44px tall. */
+    min-height: 2.75rem;
+    padding: 0 0.6rem;
+    color: var(--text);
+    text-decoration: none;
+    font-weight: 500;
+    border-bottom: 3px solid transparent;
+  }
+
+  .nav-link:visited {
+    color: var(--text);
+  }
+
+  .nav-link:hover {
+    text-decoration: underline;
+    text-underline-offset: 0.25em;
+  }
+
+  /* The current section is marked by a thick bar and bold weight, not just color. */
+  .nav-link.in-section {
+    border-bottom-color: var(--accent);
+    font-weight: 700;
+  }
+</style>

@@ -1,0 +1,118 @@
+---
+import '../styles/global.css';
+import Nav from '../components/Nav.astro';
+
+interface Props {
+  title: string;
+  description?: string;
+}
+
+const siteName = 'Arthur Chang';
+const { title, description = 'Projects I am building and weekly progress updates.' } = Astro.props;
+const pageTitle = title === siteName ? siteName : `${title} | ${siteName}`;
+const canonical = new URL(Astro.url.pathname, Astro.site);
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content={description} />
+    <meta name="generator" content={Astro.generator} />
+    <link rel="canonical" href={canonical} />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="sitemap" href="/sitemap-index.xml" />
+    <title>{pageTitle}</title>
+    <script is:inline>
+      // Lets CSS tell the difference between "JS available" and "no JS" fallbacks.
+      document.documentElement.classList.add('js');
+    </script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to main content</a>
+    <header class="site-header">
+      <div class="header-inner">
+        <a class="site-name" href="/">{siteName}</a>
+        <Nav />
+      </div>
+    </header>
+    <main id="main" tabindex="-1">
+      <slot />
+    </main>
+    <footer class="site-footer">
+      <div class="footer-inner">
+        <p>
+          &copy; {new Date().getFullYear()} {siteName}.
+          <a href="https://github.com/achang2/achang2.github.io">Source on GitHub</a>.
+        </p>
+      </div>
+    </footer>
+  </body>
+</html>
+
+<style>
+  .skip-link {
+    position: absolute;
+    left: 1rem;
+    top: -100%;
+    z-index: 100;
+    padding: 0.75rem 1rem;
+    background: var(--accent);
+    color: var(--accent-text);
+    font-weight: 700;
+    border-radius: var(--radius);
+  }
+
+  .skip-link:focus {
+    top: 0.5rem;
+  }
+
+  .site-header {
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-subtle);
+  }
+
+  .header-inner,
+  .footer-inner {
+    max-width: 68rem;
+    margin: 0 auto;
+    padding: 0.5rem 1rem;
+  }
+
+  .header-inner {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.25rem 1.5rem;
+  }
+
+  .site-name {
+    font-size: 1.2rem;
+    font-weight: 800;
+    color: var(--text);
+    text-decoration: none;
+    min-height: 2.75rem;
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .site-name:visited {
+    color: var(--text);
+  }
+
+  .site-name:hover {
+    text-decoration: underline;
+  }
+
+  .site-footer {
+    border-top: 1px solid var(--border);
+    color: var(--text-muted);
+    font-size: 0.95rem;
+  }
+
+  .site-footer p {
+    margin: 0.75rem 0;
+  }
+</style>
