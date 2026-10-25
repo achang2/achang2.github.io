@@ -1,0 +1,43 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import Icon from '../../components/Icon.astro';
+import TagList from '../../components/TagList.astro';
+import { formatDate, getUpdates, isoDate } from '../../lib/updates';
+
+const updates = await getUpdates();
+---
+
+<BaseLayout
+  title="Weekly Updates"
+  description="Weekly progress updates: what got done this week and the goals for next week."
+>
+  <h1>Weekly Updates</h1>
+  <p class="lede">
+    Each week I post what I got done and what I'm aiming for next. Writing it down publicly keeps
+    me honest.
+  </p>
+
+  {
+    updates.length === 0 ? (
+      <p>No updates yet.</p>
+    ) : (
+      <ol class="card-list">
+        {updates.map((update) => (
+          <li class="card">
+            <h2>
+              <a href={`/updates/${update.id}/`}>{update.data.title}</a>
+            </h2>
+            <p class="meta">
+              <span>
+                <Icon name="calendar" />
+                <time datetime={isoDate(update.data.date)}>{formatDate(update.data.date)}</time>
+              </span>
+            </p>
+            <p>{update.data.summary}</p>
+            <TagList tags={update.data.tags} />
+          </li>
+        ))}
+      </ol>
+    )
+  }
+</BaseLayout>

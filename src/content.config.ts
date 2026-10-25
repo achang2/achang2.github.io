@@ -15,4 +15,16 @@ const projects = defineCollection({
   }),
 });
 
-export const collections = { projects };
+const updates = defineCollection({
+  loader: glob({ pattern: '**/*.md', base: './src/content/updates' }),
+  schema: z.object({
+    title: z.string(),
+    // YYYY-MM-DD; treated as a calendar date (UTC) so it never shifts by time zone.
+    date: z.coerce.date(),
+    summary: z.string(),
+    // Free-form, lowercase tags. Each distinct tag becomes a filter on /updates/.
+    tags: z.array(z.string().trim().toLowerCase()).default([]),
+  }),
+});
+
+export const collections = { projects, updates };

@@ -1,0 +1,116 @@
+---
+import { render } from 'astro:content';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import Icon from '../../components/Icon.astro';
+import TagList from '../../components/TagList.astro';
+import { formatDate, getUpdates, isoDate, type Update } from '../../lib/updates';
+
+export async function getStaticPaths() {
+  const updates = await getUpdates();
+  return updates.map((update, i) => ({
+    params: { id: update.id },
+    // The list is newest first, so the previous index is the newer post.
+    props: { update, newer: updates[i - 1], older: updates[i + 1] },
+  }));
+}
+
+interface Props {
+  update: Update;
+  newer?: Update;
+  older?: Update;
+}
+
+const { update, newer, older } = Astro.props;
+const { Content } = await render(update);
+---
+
+<BaseLayout title={update.data.title} description={update.data.summary}>
+  <article>
+    <p class="back">
+      <a href="/updates/">
+        <Icon name="arrow-left" />
+        All weekly updates
+      </a>
+    </p>
+
+    <h1>{update.data.title}</h1>
+    <p class="meta">
+      <span>
+        <Icon name="calendar" />
+        <time datetime={isoDate(update.data.date)}>{formatDate(update.data.date)}</time>
+      </span>
+    </p>
+    <TagList tags={update.data.tags} linked />
+
+    <div class="post-body">
+      <Content />
+    </div>
+  </article>
+
+  {
+    (newer || older) && (
+      <nav class="post-nav" aria-label="More updates">
+        {older && (
+          <a href={`/updates/${older.id}/`} rel="prev">
+            <span class="post-nav-label">Older update</span>
+            {older.data.title}
+          </a>
+        )}
+        {newer && (
+          <a href={`/updates/${newer.id}/`} rel="next" class="post-nav-newer">
+            <span class="post-nav-label">Newer update</span>
+            {newer.data.title}
+          </a>
+        )}
+      </nav>
+    )
+  }
+</BaseLayout>
+
+<style>
+  .back {
+    margin: 0 0 0.5rem;
+  }
+
+  .back a {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35em;
+  }
+
+  .post-body {
+    margin-top: 1.5rem;
+  }
+
+  .post-nav {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-top: 3rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--border);
+  }
+
+  .post-nav a {
+    display: flex;
+    flex-direction: column;
+    max-width: 48%;
+  }
+
+  .post-nav-newer {
+    margin-left: auto;
+    text-align: right;
+  }
+
+  .post-nav-label {
+    font-size: 0.9rem;
+    color: var(--text-muted);
+  }
+
+  @media (max-width: 30rem) {
+    .post-nav a {
+      max-width: 100%;
+    }
+  }
+</style>

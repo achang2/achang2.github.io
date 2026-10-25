@@ -1,0 +1,50 @@
+---
+import Icon from './Icon.astro';
+
+interface Props {
+  tags: string[];
+  /** Link each tag to the updates list filtered by that tag. */
+  linked?: boolean;
+}
+
+const { tags, linked = false } = Astro.props;
+---
+
+{
+  tags.length > 0 && (
+    <ul class="pill-list" aria-label="Tags">
+      {tags.map((tag) => (
+        <li>
+          {linked ? (
+            <a class="pill tag-link" href={`/updates/?tag=${encodeURIComponent(tag)}`}>
+              <Icon name="tag" />
+              <span>
+                <span class="visually-hidden">Show all updates tagged </span>
+                {tag}
+              </span>
+            </a>
+          ) : (
+            <span class="pill">
+              <Icon name="tag" />
+              {tag}
+            </span>
+          )}
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+<style>
+  .tag-link,
+  .tag-link:visited {
+    color: var(--text);
+    text-decoration: underline;
+    text-underline-offset: 0.18em;
+  }
+
+  .tag-link:hover {
+    border-color: var(--accent);
+    text-decoration-thickness: 2px;
+  }
+</style>
