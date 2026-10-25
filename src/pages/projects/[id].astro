@@ -1,0 +1,75 @@
+---
+import { render } from 'astro:content';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import Icon from '../../components/Icon.astro';
+import StatusBadge from '../../components/StatusBadge.astro';
+import { getProjects, type Project } from '../../lib/projects';
+
+export async function getStaticPaths() {
+  const projects = await getProjects();
+  return projects.map((project) => ({ params: { id: project.id }, props: { project } }));
+}
+
+interface Props {
+  project: Project;
+}
+
+const { project } = Astro.props;
+const { Content } = await render(project);
+---
+
+<BaseLayout title={project.data.title} description={project.data.summary}>
+  <nav aria-label="Breadcrumb" class="breadcrumb">
+    <ol>
+      <li><a href="/projects/">Projects</a></li>
+      <li><span aria-current="page">{project.data.title}</span></li>
+    </ol>
+  </nav>
+
+  <h1>{project.data.title}</h1>
+  <p class="lede">{project.data.summary}</p>
+
+  <div class="meta">
+    <StatusBadge status={project.data.status} />
+    {
+      project.data.repo && (
+        <a href={project.data.repo}>
+          <Icon name="code" />
+          Source code
+        </a>
+      )
+    }
+    {
+      project.data.demo && (
+        <a href={project.data.demo}>
+          <Icon name="external-link" />
+          Live demo
+        </a>
+      )
+    }
+  </div>
+
+  <Content />
+</BaseLayout>
+
+<style>
+  .breadcrumb ol {
+    display: flex;
+    flex-wrap: wrap;
+    list-style: none;
+    padding: 0;
+    margin: 0 0 0.5rem;
+    font-size: 0.95rem;
+  }
+
+  /* The separator is CSS-generated so screen readers don't read it out. */
+  .breadcrumb li + li::before {
+    content: '/';
+    margin: 0 0.5rem;
+    color: var(--text-muted);
+  }
+
+  .meta {
+    margin-bottom: 1.5rem;
+  }
+</style>

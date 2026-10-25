@@ -1,15 +1,24 @@
 ---
 import Icon, { type IconName } from './Icon.astro';
+import { getProjects } from '../lib/projects';
 
 interface NavItem {
   href: string;
   label: string;
   icon: IconName;
+  children?: { href: string; label: string }[];
 }
+
+const projects = await getProjects();
 
 const items: NavItem[] = [
   { href: '/', label: 'About', icon: 'user' },
-  { href: '/projects/', label: 'Projects', icon: 'folder' },
+  {
+    href: '/projects/',
+    label: 'Projects',
+    icon: 'folder',
+    children: projects.map((p) => ({ href: `/projects/${p.id}/`, label: p.data.title })),
+  },
   { href: '/updates/', label: 'Weekly Updates', icon: 'calendar-check' },
 ];
 
@@ -22,8 +31,8 @@ const inSection = (href: string) => (href === '/' ? path === '/' : path.startsWi
 <nav class="site-nav" aria-label="Main">
   <ul class="nav-list">
     {
-      items.map((item) => (
-        <li class="nav-item">
+      items.map((item, i) => (
+        <li class:list={['nav-item', { 'has-submenu': item.children?.length }]}>
           <a
             class:list={['nav-link', { 'in-section': inSection(item.href) }]}
             href={item.href}
@@ -32,11 +41,85 @@ const inSection = (href: string) => (href === '/' ? path === '/' : path.startsWi
             <Icon name={item.icon} />
             {item.label}
           </a>
+          {item.children?.length ? (
+            <>
+              {/* Disclosure pattern: a separate button so the parent link still navigates. */}
+              <button
+                type="button"
+                class="submenu-toggle"
+                aria-expanded="false"
+                aria-controls={`submenu-${i}`}
+              >
+                <Icon name="chevron-down" />
+                <span class="visually-hidden">{item.label} menu</span>
+              </button>
+              <ul class="submenu" id={`submenu-${i}`}>
+                <li>
+                  <a href={item.href} aria-current={isCurrent(item.href) ? 'page' : undefined}>
+                    All {item.label.toLowerCase()}
+                  </a>
+                </li>
+                {item.children.map((child) => (
+                  <li>
+                    <a href={child.href} aria-current={isCurrent(child.href) ? 'page' : undefined}>
+                      {child.label}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </>
+          ) : null}
         </li>
       ))
     }
   </ul>
 </nav>
+
+<script>
+  // Progressive enhancement for the disclosure menus. Without JS, CSS opens them on
+  // hover and keyboard focus instead (see `html:not(.js)` rules below).
+  const items = document.querySelectorAll<HTMLLIElement>('.site-nav .has-submenu');
+
+  for (const item of items) {
+    const button = item.querySelector<HTMLButtonElement>('.submenu-toggle')!;
+
+    const setOpen = (open: boolean) => {
+      button.setAttribute('aria-expanded', String(open));
+    };
+
+    button.addEventListener('click', () => {
+      setOpen(button.getAttribute('aria-expanded') !== 'true');
+    });
+
+    // Escape closes the menu and returns focus to its button.
+    item.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && button.getAttribute('aria-expanded') === 'true') {
+        setOpen(false);
+        button.focus();
+      }
+    });
+
+    // Close when keyboard focus moves out of the menu.
+    item.addEventListener('focusout', (event) => {
+      const next = event.relatedTarget as Node | null;
+      if (next && !item.contains(next)) setOpen(false);
+    });
+
+    // Mouse users can also open it by hovering. The menu stays open while the pointer is
+    // over the item or the menu itself, and Escape dismisses it (WCAG 1.4.13).
+    item.addEventListener('pointerenter', (event) => {
+      if (event.pointerType === 'mouse') setOpen(true);
+    });
+    item.addEventListener('pointerleave', (event) => {
+      if (event.pointerType === 'mouse' && !item.contains(document.activeElement)) setOpen(false);
+    });
+
+    // Close when clicking anywhere else on the page.
+    document.addEventListener('click', (event) => {
+      if (!item.contains(event.target as Node)) setOpen(false);
+    });
+  }
+</script>
 
 <style>
   .nav-list {
@@ -51,6 +134,7 @@ const inSection = (href: string) => (href === '/' ? path === '/' : path.startsWi
   .nav-item {
     position: relative;
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
   }
 
@@ -80,5 +164,104 @@ const inSection = (href: string) => (href === '/' ? path === '/' : path.startsWi
   .nav-link.in-section {
     border-bottom-color: var(--accent);
     font-weight: 700;
+  }
+
+  .submenu-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 2.75rem;
+    min-height: 2.75rem;
+    margin-left: -0.4rem;
+    padding: 0;
+    border: 1px solid transparent;
+    border-radius: var(--radius);
+    background: none;
+    color: var(--text);
+    cursor: pointer;
+  }
+
+  .submenu-toggle:hover {
+    border-color: var(--border);
+  }
+
+  .submenu-toggle .icon {
+    transition: transform 0.15s ease;
+  }
+
+  .submenu-toggle[aria-expanded='true'] .icon {
+    transform: rotate(180deg);
+  }
+
+  .submenu {
+    display: none;
+    list-style: none;
+    margin: 0;
+    padding: 0.4rem;
+    min-width: 14rem;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: 0 6px 20px rgb(0 0 0 / 0.15);
+    z-index: 50;
+  }
+
+  .submenu a {
+    display: block;
+    padding: 0.55rem 0.75rem;
+    border-radius: 4px;
+    color: var(--text);
+    text-decoration: none;
+  }
+
+  .submenu a:hover {
+    background: var(--bg-subtle);
+    text-decoration: underline;
+  }
+
+  /* Current page inside the menu: bold plus a left bar, not just color. */
+  .submenu a[aria-current='page'] {
+    font-weight: 700;
+    box-shadow: inset 4px 0 0 var(--accent);
+  }
+
+  /* With JS: open state is driven by the button's aria-expanded. */
+  :global(html.js) .submenu-toggle[aria-expanded='true'] + .submenu {
+    display: block;
+  }
+
+  /* Without JS: open on hover or whenever focus is inside the menu item. */
+  :global(html:not(.js)) .has-submenu:hover .submenu,
+  :global(html:not(.js)) .has-submenu:focus-within .submenu {
+    display: block;
+  }
+
+  :global(html:not(.js)) .submenu-toggle {
+    display: none;
+  }
+
+  /* Wide screens: float the submenu below its item. Narrow screens: it pushes content down. */
+  @media (min-width: 40rem) {
+    .submenu {
+      position: absolute;
+      top: 100%;
+      left: 0;
+    }
+  }
+
+  @media (max-width: 39.99rem) {
+    .submenu {
+      flex-basis: 100%;
+    }
+  }
+
+  @media (forced-colors: active) {
+    .nav-link.in-section {
+      border-bottom-color: Highlight;
+    }
+
+    .submenu a[aria-current='page'] {
+      text-decoration: underline;
+    }
   }
 </style>

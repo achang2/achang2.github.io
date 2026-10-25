@@ -1,0 +1,30 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import StatusBadge from '../../components/StatusBadge.astro';
+import { getProjects } from '../../lib/projects';
+
+const projects = await getProjects();
+---
+
+<BaseLayout title="Projects" description="Projects Arthur Chang is working on.">
+  <h1>Projects</h1>
+  <p class="lede">What I'm building right now, and what's next.</p>
+
+  {
+    projects.length === 0 ? (
+      <p>No projects yet. Check back soon.</p>
+    ) : (
+      <ul class="card-list">
+        {projects.map((project) => (
+          <li class="card">
+            <h2>
+              <a href={`/projects/${project.id}/`}>{project.data.title}</a>
+            </h2>
+            <p>{project.data.summary}</p>
+            <StatusBadge status={project.data.status} />
+          </li>
+        ))}
+      </ul>
+    )
+  }
+</BaseLayout>

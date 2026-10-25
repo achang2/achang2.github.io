@@ -1,0 +1,15 @@
+---
+import Icon from './Icon.astro';
+import { statusLabels, type ProjectStatus } from '../lib/projects';
+
+interface Props {
+  status: ProjectStatus;
+}
+
+const { status } = Astro.props;
+---
+
+<span class="pill">
+  <Icon name={`status-${status}`} />
+  <span><span class="visually-hidden">Status: </span>{statusLabels[status]}</span>
+</span>
